@@ -2,7 +2,7 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from config import API_KEY, BASE_URL, MODEL
+from src.utils.config import API_KEY, BASE_URL, MODEL
 
 
 class LLMClient:
@@ -16,11 +16,15 @@ class LLMClient:
         self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
     ):
         response = await self.client.chat.completions.create(
-            model=MODEL,
-            messages=messages,
+            model=MODEL, # type: ignore
+            messages=messages, # type: ignore
             stream=False,
-            tools=tools,
-            extra_body={"reasoning": {"enabled": True}},
+            tools=tools, # type: ignore
+            extra_body={
+                "chat_template_kwargs": {
+                    "enable_thinking": True,
+                },
+                "reasoning_budget": 16384,
+            },
         )
-
         return response.choices[0].message
