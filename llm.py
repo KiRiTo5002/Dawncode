@@ -13,13 +13,14 @@ class LLMClient:
         )
 
     async def chat_completion(
-        self,
-        messages: list[dict[str, Any]],
+        self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]
     ):
         response = await self.client.chat.completions.create(
             model=MODEL,
             messages=messages,
             stream=False,
+            tools=tools,
+            extra_body={"reasoning": {"enabled": True}},
         )
 
-        return response.choices[0].message.content
+        return response.choices[0].message
