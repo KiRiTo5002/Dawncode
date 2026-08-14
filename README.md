@@ -118,7 +118,7 @@ The project will gradually evolve from a simple LLM chat interface into a functi
 * [x] Conversation history
 * [x] Interactive CLI
 * [x] Basic file reading capability
-* [ ] LLM tool calling
+* [x] LLM tool calling
 * [ ] File editing
 * [ ] Shell command execution
 * [ ] Agent loop
