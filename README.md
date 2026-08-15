@@ -1,3 +1,4 @@
+````text
 # DawnCode
 
 DawnCode is a coding agent built from scratch in Python.
@@ -25,7 +26,7 @@ DawnCode currently uses NVIDIA Nemotron 3 Ultra 550B through an OpenAI-compatibl
 
 The core agent loop currently looks like:
 
-
+```text
 User
   ↓
 LLM
@@ -43,11 +44,11 @@ Tool Result
 LLM
   ↓
 Final Response
-`
+````
 
 For example:
 
-
+```text
 User: What is inside src/models/llm.py?
                     ↓
 Nemotron decides to use read_file
@@ -61,13 +62,13 @@ DawnCode executes the function
 File contents are returned to Nemotron
                     ↓
 Nemotron generates the final response
-
+```
 
 The agent can also chain multiple tool calls when the model needs to explore the project before answering.
 
 For example:
 
-
+```text
 User: What is inside llm.py?
                     ↓
 read_file("llm.py")
@@ -83,7 +84,7 @@ list_directory("src/models")
 read_file("src/models/llm.py")
                     ↓
 Final response
-
+```
 
 ## Current Tools
 
@@ -91,25 +92,25 @@ Final response
 
 Reads the contents of a file.
 
-python
+```python
 read_file("src/models/llm.py")
-
+```
 
 ### `list_directory`
 
 Lists the contents of a directory.
 
-python
+```python
 list_directory("src/models")
-
+```
 
 Example result:
 
-
+```text
 llm.py
 __init__.py
 __pycache__
-
+```
 
 ## Tool Architecture
 
@@ -124,19 +125,19 @@ Each tool contains:
 
 The tool converts itself into an OpenAI-compatible function schema before being passed to the LLM.
 
-
+```text
 Tool
 ├── name
 ├── description
 ├── parameters
 └── function
-
+```
 
 The current tools are implemented in `src/tools/filesystem.py`.
 
 ## Project Structure
 
-
+```text
 DawnCode/
 │
 ├── main.py
@@ -164,7 +165,7 @@ DawnCode/
 ├── pyproject.toml
 ├── uv.lock
 └── README.md
-
+```
 
 ### `main.py`
 
@@ -224,11 +225,11 @@ DawnCode is responsible for:
 
 Create a `.env` file based on `.env.example`.
 
-env
+```env
 NVIDIA_API_KEY=your_api_key
 BASE_URL=https://integrate.api.nvidia.com/v1
 MODEL=nvidia/nemotron-3-ultra-550b
-
+```
 
 Never commit the API key to the repository.
 
@@ -236,23 +237,23 @@ Never commit the API key to the repository.
 
 Install dependencies with `uv`:
 
-bash
+```bash
 uv sync
-
+```
 
 Then run:
 
-bash
+```bash
 python main.py
-
+```
 
 Example:
 
-
+```text
 input: what is inside src/models/llm.py?
 
 DawnCode: The llm.py file contains...
-
+```
 
 Type `exit` to terminate the session.
 
@@ -264,7 +265,7 @@ The purpose is to understand the mechanics behind coding agents rather than imme
 
 The architecture currently keeps responsibilities separated without introducing unnecessary abstractions:
 
-
+```text
 Agent
   │
   ├── LLM Client
@@ -274,7 +275,7 @@ Agent
        │
        ├── read_file
        └── list_directory
-
+```
 
 New abstractions will be introduced when the complexity of the project actually requires them.
 
@@ -306,9 +307,9 @@ DawnCode is in early development.
 
 The fundamental:
 
-
+```text
 LLM → Tool Call → Tool Execution → Tool Result → LLM
-
+```
 
 loop is functional.
 
@@ -335,3 +336,7 @@ DawnCode is an attempt to understand those components by building them directly.
 ## License
 
 This project is currently a personal learning and experimentation project.
+
+```
+
+```
