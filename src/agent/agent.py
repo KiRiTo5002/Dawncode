@@ -61,7 +61,7 @@ async def agent():
         messages.append(message)
 
         response = await client.chat_completion(messages=messages, tools=tools)
-        if response.tool_calls:
+        while response.tool_calls:
             tool_call = response.tool_calls[0]
             function = tool_call.function.name
             args = json.loads(tool_call.function.arguments)
@@ -89,11 +89,11 @@ async def agent():
                     tools=tools,
                 )
 
-                print(f"DawnCode: {response.content}")
+            
             else:
                 print(f"Unknown tool: {function}")
+                break
 
-        else:
-            print(f"DawnCode: {response.content}")
-            message = {"role": "assistant", "content": response.content}
-            messages.append(message)
+        print(f"DawnCode: {response.content}")
+        message = {"role": "assistant", "content": response.content}
+        messages.append(message)
