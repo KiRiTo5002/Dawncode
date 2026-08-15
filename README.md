@@ -1,4 +1,4 @@
-````text
+
 # DawnCode
 
 DawnCode is a coding agent built from scratch in Python.
@@ -44,7 +44,7 @@ Tool Result
 LLM
   ↓
 Final Response
-````
+```
 
 For example:
 
@@ -336,7 +336,3 @@ DawnCode is an attempt to understand those components by building them directly.
 ## License
 
 This project is currently a personal learning and experimentation project.
-
-```
-
-```
