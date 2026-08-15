@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from src.tools.base import Tool
+
 
 def read_file(path: str):
     try:
@@ -11,6 +13,7 @@ def read_file(path: str):
 
     except IsADirectoryError:
         return f"Path is a directory, not a file: {path}"
+
 
 def list_directory(path: str):
     try:
@@ -27,4 +30,36 @@ def list_directory(path: str):
 
     except NotADirectoryError:
         return f"Path is not a directory: {path}"
-    
+
+
+read_file_tool = Tool(
+    name="read_file",
+    description="Read the contents of a file.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "The path of the file to read.",
+            }
+        },
+        "required": ["path"],
+    },
+    function=read_file,
+)
+
+list_directory_tool = Tool(
+    name="list_directory",
+    description="List the contents of a directory.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "The path of the directory to list.",
+            }
+        },
+        "required": ["path"],
+    },
+    function=list_directory,
+)
