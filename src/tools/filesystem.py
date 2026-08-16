@@ -99,7 +99,7 @@ def execute_command(command: str) -> str:
             f"STDERR:\n{result.stderr or '[No errors]'}"
         )
 
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001
         return (
             "Exit Code: -1\n\n"
             "STDOUT:\n[No output]\n\n"
