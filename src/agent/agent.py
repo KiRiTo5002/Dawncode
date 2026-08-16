@@ -1,8 +1,11 @@
 import json
 
+from openai import APIError
+
 from src.models.llm import LLMClient
 from src.tools.filesystem import (
     edit_file_tool,
+    execute_command_tool,
     list_directory_tool,
     read_file_tool,
     write_file_tool,
@@ -102,6 +105,7 @@ async def agent():
         list_directory_tool,
         write_file_tool,
         edit_file_tool,
+        execute_command_tool
     ]
     tool_schemas = [tool.to_schema() for tool in tools]
     messages = []
@@ -121,34 +125,38 @@ async def agent():
             )
 
             while True:
-                assistant_content, tool_calls = await stream_response(
-                    client=client,
-                    terminal=terminal,
-                    messages=messages,
-                    tool_schemas=tool_schemas,
-                )
+                try:
+                    assistant_content, tool_calls = await stream_response(
+                        client=client,
+                        terminal=terminal,
+                        messages=messages,
+                        tool_schemas=tool_schemas,
+                    )
 
-                if not tool_calls:
+                    if not tool_calls:
+                        messages.append(
+                            {
+                                "role": "assistant",
+                                "content": assistant_content,
+                            }
+                        )
+                        break
+            
+
                     messages.append(
                         {
                             "role": "assistant",
                             "content": assistant_content,
+                            "tool_calls": build_assistant_tool_calls(tool_calls),
                         }
                     )
-                    break
 
-                messages.append(
-                    {
-                        "role": "assistant",
-                        "content": assistant_content,
-                        "tool_calls": build_assistant_tool_calls(tool_calls),
-                    }
-                )
-
-                execute_tool_calls(
-                    tool_calls=tool_calls,
-                    tools=tools,
-                    messages=messages,
-                )
+                    execute_tool_calls(
+                        tool_calls=tool_calls,
+                        tools=tools,
+                        messages=messages,
+                    )
+                except APIError as e:
+                    terminal.error(f"LLM Request Failed:{e}")
     finally:
         await client.close()

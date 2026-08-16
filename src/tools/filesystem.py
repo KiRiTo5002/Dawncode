@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 from src.tools.base import Tool
@@ -74,6 +75,35 @@ def edit_file(path: str, old_content: str, new_content: str):
 
     except OSError as error:
         return f"Could not edit {path}: {error}"
+
+
+
+
+def execute_command(command: str) -> str:
+    """
+    Execute a shell command and return its output and exit code.
+    """
+    try:
+        result = subprocess.run(
+            command,
+            shell=True,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        return (
+            f"Exit Code: {result.returncode}\n\n"
+            f"STDOUT:\n{result.stdout or '[No output]'}\n\n"
+            f"STDERR:\n{result.stderr or '[No errors]'}"
+        )
+
+    except Exception as e:  # noqa: BLE001
+        return (
+            "Exit Code: -1\n\n"
+            "STDOUT:\n[No output]\n\n"
+            f"STDERR:\n{e}"
+        )
 
 
 list_directory_tool = Tool(
@@ -162,4 +192,22 @@ edit_file_tool = Tool(
         "required": ["path", "old_content", "new_content"],
     },
     function=edit_file,
+)
+execute_command_tool = Tool(
+    name="execute_command",
+    description=(
+        "Execute a shell command in the current workspace. "
+        "Returns the command's exit code, standard output, and standard error."
+    ),
+    parameters={
+        "type": "object",
+        "properties": {
+            "command": {
+                "type": "string",
+                "description": "The shell command to execute.",
+            }
+        },
+        "required": ["command"],
+    },
+    function=execute_command,
 )

@@ -34,6 +34,8 @@ class Terminal:
             style="blue",
             end="",
         )
+    def error(self, message: str):
+        self.console.print(message, style="bold red")
 
     def end_assistant(self):
         self.console.print()
