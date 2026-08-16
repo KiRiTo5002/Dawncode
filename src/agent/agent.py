@@ -7,16 +7,15 @@ from src.tools.filesystem import (
     read_file_tool,
     write_file_tool,
 )
+from src.utils.terminal import Terminal
 
 
-async def stream_response(client, messages, tool_schemas):
+async def stream_response(client, terminal, messages, tool_schemas):
     """Stream an LLM response and collect any tool calls."""
-
     response = await client.chat_completion_stream(
         messages=messages,
         tools=tool_schemas,
     )
-
     assistant_content = ""
     tool_calls = {}
     started_content = False
@@ -28,7 +27,6 @@ async def stream_response(client, messages, tool_schemas):
 
             delta = chunk.choices[0].delta
 
-            # Accumulate streamed tool calls.
             if delta.tool_calls:
                 for call in delta.tool_calls:
                     if call.index not in tool_calls:
@@ -42,47 +40,43 @@ async def stream_response(client, messages, tool_schemas):
                             call.function.arguments or ""
                         )
 
-            # Stream assistant content.
-            if delta.content and delta.content.strip():
+            if delta.content:
                 if not started_content:
-                    print("DawnCode: ", end="", flush=True)
+                    if not delta.content.strip():
+                        continue
+                    terminal.start_assistant()
                     started_content = True
 
-                print(delta.content, end="", flush=True)
+                terminal.stream_assistant(delta.content)
                 assistant_content += delta.content
-
+                
+                
     finally:
         await response.close()
 
     if started_content:
-        print()
+        terminal.end_assistant()
 
     return assistant_content, tool_calls
 
 
 def build_assistant_tool_calls(tool_calls):
     """Convert accumulated tool calls into API message format."""
-
-    assistant_tool_calls = []
-
-    for call in tool_calls.values():
-        assistant_tool_calls.append(
-            {
-                "id": call["id"],
-                "type": "function",
-                "function": {
-                    "name": call["name"],
-                    "arguments": call["arguments"],
-                },
-            }
-        )
-
-    return assistant_tool_calls
+    return [
+        {
+            "id": call["id"],
+            "type": "function",
+            "function": {
+                "name": call["name"],
+                "arguments": call["arguments"],
+            },
+        }
+        for call in tool_calls.values()
+    ]
 
 
 def execute_tool_calls(tool_calls, tools, messages):
     """Execute tool calls and append their results to the conversation."""
-
     for call in tool_calls.values():
         function_name = call["name"]
         arguments = json.loads(call["arguments"])
@@ -90,7 +84,6 @@ def execute_tool_calls(tool_calls, tools, messages):
         for tool in tools:
             if tool.name == function_name:
                 result = tool.execute(**arguments)
-
                 messages.append(
                     {
                         "role": "tool",
@@ -98,30 +91,24 @@ def execute_tool_calls(tool_calls, tools, messages):
                         "content": result,
                     }
                 )
-
                 break
 
 
 async def agent():
     client = LLMClient()
-
+    terminal = Terminal()
     tools = [
         read_file_tool,
         list_directory_tool,
         write_file_tool,
-        edit_file_tool
+        edit_file_tool,
     ]
-
-    tool_schemas = [
-        tool.to_schema()
-        for tool in tools
-    ]
-
+    tool_schemas = [tool.to_schema() for tool in tools]
     messages = []
 
     try:
         while True:
-            user_input = input("input:").strip()
+            user_input = terminal.user_input().strip()
 
             if user_input.lower() == "exit":
                 break
@@ -133,16 +120,14 @@ async def agent():
                 }
             )
 
-            # One user request can require multiple
-            # LLM -> tool -> LLM cycles.
             while True:
                 assistant_content, tool_calls = await stream_response(
                     client=client,
+                    terminal=terminal,
                     messages=messages,
                     tool_schemas=tool_schemas,
                 )
 
-                # No tool call means this is the final response.
                 if not tool_calls:
                     messages.append(
                         {
@@ -150,30 +135,20 @@ async def agent():
                             "content": assistant_content,
                         }
                     )
-
                     break
-
-                # Record the assistant's tool-call request.
-                assistant_tool_calls = build_assistant_tool_calls(
-                    tool_calls
-                )
 
                 messages.append(
                     {
                         "role": "assistant",
                         "content": assistant_content,
-                        "tool_calls": assistant_tool_calls,
+                        "tool_calls": build_assistant_tool_calls(tool_calls),
                     }
                 )
 
-                # Execute tools and add their results to the conversation.
                 execute_tool_calls(
                     tool_calls=tool_calls,
                     tools=tools,
                     messages=messages,
                 )
-
-                # Run the LLM again with the tool results.
-
     finally:
         await client.close()
