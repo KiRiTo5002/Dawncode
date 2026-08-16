@@ -2,8 +2,10 @@ import json
 
 from src.models.llm import LLMClient
 from src.tools.filesystem import (
+    edit_file_tool,
     list_directory_tool,
     read_file_tool,
+    write_file_tool,
 )
 
 
@@ -106,6 +108,8 @@ async def agent():
     tools = [
         read_file_tool,
         list_directory_tool,
+        write_file_tool,
+        edit_file_tool
     ]
 
     tool_schemas = [
