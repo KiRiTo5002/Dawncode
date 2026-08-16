@@ -1,338 +1,186 @@
-
 # DawnCode
 
-DawnCode is a coding agent built from scratch in Python.
+DawnCode is an AI-powered coding assistant that runs in your terminal. It uses a Large Language Model (LLM) to understand your requests and can perform file operations and execute commands in your workspace.
 
-The goal of the project is to understand how AI coding agents work internally by implementing the core agent loop ourselves instead of relying on an agent framework.
+## What the Application Does
 
-DawnCode currently uses NVIDIA Nemotron 3 Ultra 550B through an OpenAI-compatible API.
+DawnCode provides an interactive terminal-based chat interface where you can:
 
-## Current Capabilities
+- Ask questions about your codebase
+- Request file operations (read, write, edit, list directories)
+- Execute shell commands
+- Get help with coding tasks
 
-- Maintain conversation history
-- Communicate asynchronously with an LLM
-- Stream LLM responses
-- Use LLM function/tool calling
-- Accumulate streamed tool-call arguments
-- Read files from a project
-- List directory contents
-- Execute tools selected by the LLM
-- Send tool results back to the LLM
-- Continue the agent loop after tool execution
-- Support multiple tools
-- Use a `Tool` abstraction for defining tool capabilities
+The agent maintains conversation context and can chain multiple tool calls to accomplish complex tasks.
 
-## How It Works
+> **This README was written by DawnCode.**
+>
+> DawnCode inspected its own Python source code, generated this documentation, wrote it to `README.md`, and then read it back to verify the result.
 
-The core agent loop currently looks like:
+## Current Tool Capabilities
 
-```text
-User
-  ↓
-LLM
-  ↓
-Stream response
-  ↓
-Tool Call
-  ↓
-Accumulate tool-call data
-  ↓
-DawnCode executes Python function
-  ↓
-Tool Result
-  ↓
-LLM
-  ↓
-Final Response
-```
+DawnCode currently provides 5 tools that the LLM can invoke:
 
-For example:
+| Tool | Description |
+| ------ | ------------- |
+| `list_directory` | List the contents of a directory |
+| `read_file` | Read the contents of a file (UTF-8 text files only) |
+| `write_file` | Write content to a file, creating parent directories as needed |
+| `edit_file` | Replace specific content in a file (requires exact unique match) |
+| `execute_command` | Execute a shell command and return exit code, stdout, and stderr |
 
-```text
-User: What is inside src/models/llm.py?
-                    ↓
-Nemotron decides to use read_file
-                    ↓
-DawnCode accumulates the streamed tool call
-                    ↓
-read_file("src/models/llm.py")
-                    ↓
-DawnCode executes the function
-                    ↓
-File contents are returned to Nemotron
-                    ↓
-Nemotron generates the final response
-```
+## How the Agent Loop Works
 
-The agent can also chain multiple tool calls when the model needs to explore the project before answering.
+The agent runs a continuous conversation loop:
 
-For example:
+1. **User Input** - The terminal prompts for user input
+2. **Message History** - User message is added to the conversation history
+3. **Stream LLM Response** - The LLM streams a response, which may include:
+   - Text content (displayed in real-time)
+   - Tool calls (accumulated during streaming)
+4. **Handle Tool Calls** - If the LLM made tool calls:
+   - Execute each tool call
+   - Append tool results to the conversation
+   - Loop back to step 3 for the LLM to continue
+5. **No Tool Calls** - If the LLM responds without tool calls, the assistant message is added to history and the loop waits for the next user input
+6. **Exit** - Type "exit" to quit
 
-```text
-User: What is inside llm.py?
-                    ↓
-read_file("llm.py")
-                    ↓
-File not found
-                    ↓
-list_directory(".")
-                    ↓
-list_directory("src")
-                    ↓
-list_directory("src/models")
-                    ↓
-read_file("src/models/llm.py")
-                    ↓
-Final response
-```
-
-## Current Tools
-
-### `read_file`
-
-Reads the contents of a file.
-
-```python
-read_file("src/models/llm.py")
-```
-
-### `list_directory`
-
-Lists the contents of a directory.
-
-```python
-list_directory("src/models")
-```
-
-Example result:
-
-```text
-llm.py
-__init__.py
-__pycache__
-```
-
-## Tool Architecture
-
-DawnCode uses a small `Tool` abstraction to separate the actual Python function from the information exposed to the LLM.
-
-Each tool contains:
-
-- A name
-- A description
-- A parameter schema
-- The Python function used to execute it
-
-The tool converts itself into an OpenAI-compatible function schema before being passed to the LLM.
-
-```text
-Tool
-├── name
-├── description
-├── parameters
-└── function
-```
-
-The current tools are implemented in `src/tools/filesystem.py`.
+The loop handles retries (up to 5 attempts with 2-second delays) for failed LLM requests.
 
 ## Project Structure
 
-```text
-DawnCode/
-│
-├── main.py
-│
+```
+dawncode/
+├── main.py                 # Entry point
+├── pyproject.toml          # Project configuration
+├── .env.example            # Example environment variables
 ├── src/
 │   ├── agent/
 │   │   ├── __init__.py
-│   │   └── agent.py
-│   │
+│   │   └── agent.py        # Main agent loop and streaming logic
 │   ├── models/
 │   │   ├── __init__.py
-│   │   └── llm.py
-│   │
+│   │   └── llm.py          # LLM client wrapper (AsyncOpenAI)
 │   ├── tools/
 │   │   ├── __init__.py
-│   │   ├── base.py
-│   │   └── filesystem.py
-│   │
+│   │   ├── base.py         # Tool base class
+│   │   └── filesystem.py   # File system and command execution tools
 │   └── utils/
 │       ├── __init__.py
-│       └── config.py
-│
-├── .env.example
-├── .gitignore
-├── pyproject.toml
-├── uv.lock
-└── README.md
+│       ├── config.py       # Configuration loading from .env
+│       └── terminal.py     # Rich-based terminal UI
 ```
+
+## Main Python Modules and Their Responsibilities
 
 ### `main.py`
 
-Application entry point. Starts the asynchronous DawnCode agent.
+Entry point. Initializes the terminal UI and runs the async agent loop.
 
-### `src/agent/`
+### `src/agent/agent.py`
 
-Contains the agent loop and conversation handling.
+Core agent logic:
 
-Responsible for:
+- `stream_response()` - Streams LLM response, accumulates tool calls
+- `build_assistant_tool_calls()` - Converts accumulated tool calls to API message format
+- `execute_tool_calls()` - Executes tool calls and appends results to conversation
+- `agent()` - Main async loop handling user input, LLM interaction, and tool execution
 
-- User input
-- Conversation history
-- Streaming LLM responses
-- Collecting tool calls
-- Tool execution
-- Sending tool results back to the LLM
+### `src/models/llm.py`
 
-### `src/models/`
+`LLMClient` class wrapping `AsyncOpenAI`:
 
-Contains the LLM client and API communication.
+- Configures client with API key and base URL from environment
+- Provides `chat_completion_stream()` with retry logic (5 attempts)
+- Sends `enable_thinking: True` and `reasoning_budget: 4096` in extra_body
+- Handles cleanup with `close()`
 
-### `src/tools/`
+### `src/tools/base.py`
 
-Contains the capabilities available to DawnCode.
+`Tool` base class:
 
-Currently:
+- Stores name, description, parameters schema, and executable function
+- `to_schema()` - Returns OpenAI function calling schema
+- `execute()` - Calls the wrapped function with provided arguments
 
-- `read_file()`
-- `list_directory()`
+### `src/tools/filesystem.py`
 
-`base.py` contains the `Tool` abstraction used to define and execute tools.
+Five concrete tool implementations:
 
-### `src/utils/`
+- `list_directory(path)` - Returns newline-separated directory entries
+- `read_file(path)` - Returns file content or error message
+- `write_file(path, content)` - Creates directories, writes file
+- `edit_file(path, old_content, new_content)` - Replaces exact unique match only
+- `execute_command(command)` - Runs shell command, returns exit code + stdout + stderr
 
-Contains shared configuration and environment setup.
+Each tool is instantiated as a `Tool` object with its JSON schema.
 
-## LLM
+### `src/utils/config.py`
 
-DawnCode currently uses:
+Loads configuration from `.env` file using `python-dotenv`:
 
-**NVIDIA Nemotron 3 Ultra 550B**
+- `NVIDIA_API_KEY` - API key for NVIDIA API
+- `BASE_URL` - API base URL (default: `https://integrate.api.nvidia.com/v1`)
+- `MODEL` - Model identifier (default: `nvidia/nemotron-3-ultra-550b`)
 
-through an OpenAI-compatible API.
+### `src/utils/terminal.py`
 
-The LLM decides when a tool is needed and determines the arguments to pass to it.
+`Terminal` class using `rich` for UI:
 
-DawnCode is responsible for:
+- `show_banner()` - Displays ASCII art banner
+- `user_input()` - Prompts for user input with styled prompt
+- `start_assistant()` / `stream_assistant()` / `end_assistant()` - Streaming output handling
+- `error()` - Displays error messages in red
 
-1. Receiving the streamed response
-2. Accumulating tool-call fragments
-3. Parsing the tool arguments
-4. Executing the requested Python function
-5. Returning the result to the LLM
+## How to Configure the Application
 
-## Configuration
+1. Copy `.env.example` to `.env`:
 
-Create a `.env` file based on `.env.example`.
+   ```bash
+   cp .env.example .env
+   ```
 
-```env
-NVIDIA_API_KEY=your_api_key
-BASE_URL=https://integrate.api.nvidia.com/v1
-MODEL=nvidia/nemotron-3-ultra-550b
-```
+2. Edit `.env` with your credentials:
 
-Never commit the API key to the repository.
+   ```env
+   NVIDIA_API_KEY=your_actual_api_key
+   BASE_URL=https://integrate.api.nvidia.com/v1
+   MODEL=nvidia/nemotron-3-ultra-550b
+   ```
 
-## Running DawnCode
+Required: `NVIDIA_API_KEY` must be set. The other two have defaults shown above.
 
-Install dependencies with `uv`:
+## How to Run It
+
+### Using uv (recommended)
 
 ```bash
 uv sync
+uv run main.py
 ```
 
-Then run:
+### Using pip
+
+```bash
+pip install -e .
+python main.py
+```
+
+### Direct execution (if dependencies installed)
 
 ```bash
 python main.py
 ```
 
-Example:
+## Current Limitations
 
-```text
-input: what is inside src/models/llm.py?
-
-DawnCode: The llm.py file contains...
-```
-
-Type `exit` to terminate the session.
-
-## Design Philosophy
-
-DawnCode is intentionally being built incrementally.
-
-The purpose is to understand the mechanics behind coding agents rather than immediately hiding them behind an agent framework.
-
-The architecture currently keeps responsibilities separated without introducing unnecessary abstractions:
-
-```text
-Agent
-  │
-  ├── LLM Client
-  │
-  └── Tools
-       ├── Tool
-       │
-       ├── read_file
-       └── list_directory
-```
-
-New abstractions will be introduced when the complexity of the project actually requires them.
-
-## Roadmap
-
-- [x] LLM communication
-- [x] Conversation history
-- [x] Function/tool calling
-- [x] File reading
-- [x] Directory listing
-- [x] Tool abstraction
-- [x] Direct NVIDIA/Nemotron integration
-- [x] Streaming responses
-- [x] Streamed tool-call accumulation
-- [x] Tool execution loop
-- [x] Sending tool results back to the LLM
-- [x] Multiple tool calls
-- [ ] Improve error handling
-- [ ] Write and modify files
-- [ ] Search through a codebase
-- [ ] Execute shell commands
-- [ ] Add project/context awareness
-- [ ] Add tests
-- [ ] Build more autonomous coding workflows
-
-## Current Status
-
-DawnCode is in early development.
-
-The fundamental:
-
-```text
-LLM → Tool Call → Tool Execution → Tool Result → LLM
-```
-
-loop is functional.
-
-DawnCode can currently explore a project using filesystem tools, execute the tools selected by the LLM, and continue the agent loop until it can produce a final response.
-
-The next stage is expanding DawnCode's ability to understand and modify an existing codebase.
-
-## Why Build This?
-
-AI coding agents look simple from the outside, but underneath they require several interacting components:
-
-- LLM reasoning
-- Tool calling
-- Tool execution
-- Conversation state
-- Context management
-- File operations
-- Command execution
-- Error handling
-- Agent loops
-
-DawnCode is an attempt to understand those components by building them directly.
-
-## License
-
-This project is currently a personal learning and experimentation project.
+1. **Single model provider** - Only works with OpenAI-compatible APIs (tested with NVIDIA API)
+2. **No persistent memory** - Conversation history is lost when the application exits
+3. **No file type detection** - `read_file` only works with UTF-8 text files; binary files return an error
+4. **Edit tool strictness** - `edit_file` requires the old content to match exactly once; no fuzzy matching
+5. **No sandboxing** - `execute_command` runs with full user permissions in the workspace
+6. **Fixed retry logic** - Retries are hardcoded to 5 attempts with 2-second delays
+7. **No conversation export** - No way to save or load conversation history
+8. **Single-threaded** - Only one conversation at a time
+9. **No configuration file** - All config via environment variables only
+10. **No tests** - No test suite exists in the current codebase

@@ -21,25 +21,24 @@ def list_directory(path: str):
         return f"Path is not a directory: {path}"
 
 
-def read_file(path: str):
+def read_file(path: str) -> str:
     try:
-        with open(path, "r") as file:
+        with open(path, "r", encoding="utf-8") as file:
             return file.read()
 
     except FileNotFoundError:
         return f"File not found: {path}"
 
-    except IsADirectoryError:
-        return f"Path is a directory, not a file: {path}"
+    except UnicodeDecodeError:
+        return f"Unable to read '{path}': file is not a UTF-8 text file."
 
 
 def write_file(path: str, content: str):
     try:
         file_path = Path(path)
-
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(file_path, "w") as file:
+        with open(file_path, "w", encoding="utf-8") as file:
             file.write(content)
 
         return f"Successfully wrote to {path}"
@@ -47,9 +46,10 @@ def write_file(path: str, content: str):
     except OSError as error:
         return f"Failed to write to {path}: {error}"
 
+
 def edit_file(path: str, old_content: str, new_content: str):
     try:
-        with open(path, "r") as file:
+        with open(path, "r", encoding="utf-8") as file:
             data = file.read()
 
         count = data.count(old_content)
@@ -65,7 +65,7 @@ def edit_file(path: str, old_content: str, new_content: str):
 
         updated_data = data.replace(old_content, new_content)
 
-        with open(path, "w") as file:
+        with open(path, "w", encoding="utf-8") as file:
             file.write(updated_data)
 
         return f"Successfully edited {path}."
@@ -73,10 +73,11 @@ def edit_file(path: str, old_content: str, new_content: str):
     except FileNotFoundError:
         return f"Could not edit {path}: file does not exist."
 
+    except UnicodeDecodeError:
+        return f"Could not edit {path}: file is not a UTF-8 text file."
+
     except OSError as error:
         return f"Could not edit {path}: {error}"
-
-
 
 
 def execute_command(command: str) -> str:
@@ -98,11 +99,11 @@ def execute_command(command: str) -> str:
             f"STDERR:\n{result.stderr or '[No errors]'}"
         )
 
-    except Exception as e:  # noqa: BLE001
+    except Exception as error:
         return (
             "Exit Code: -1\n\n"
             "STDOUT:\n[No output]\n\n"
-            f"STDERR:\n{e}"
+            f"STDERR:\n{error}"
         )
 
 
@@ -122,6 +123,7 @@ list_directory_tool = Tool(
     function=list_directory,
 )
 
+
 read_file_tool = Tool(
     name="read_file",
     description="Read the contents of a file.",
@@ -137,6 +139,7 @@ read_file_tool = Tool(
     },
     function=read_file,
 )
+
 
 write_file_tool = Tool(
     name="write_file",
@@ -161,6 +164,7 @@ write_file_tool = Tool(
     },
     function=write_file,
 )
+
 
 edit_file_tool = Tool(
     name="edit_file",
@@ -193,6 +197,8 @@ edit_file_tool = Tool(
     },
     function=edit_file,
 )
+
+
 execute_command_tool = Tool(
     name="execute_command",
     description=(
